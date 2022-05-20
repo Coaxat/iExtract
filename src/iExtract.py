@@ -1,5 +1,9 @@
 import os
 import platform
+import sqlite3
+import NSKeyedUnArchiver
+from click import FileError
+from liveProgress import LiveProgress
 from utils import Utils
 
 _os_based_backups_rootdir =  { 
@@ -204,5 +208,84 @@ class iExtract(object):
             backups.append(infos[0])
 
         return backups
+
+
+    @classmethod
+    def load_files(cls, backup_dir: str = None):
+
+        if backup_dir is None:
+            
+            dir = cls._backup_dir
+
+            if dir is None:
+                raise AttributeError("Backup dir required")
+
+        else:
+            dir = os.path.expanduser(os.path.expandvars(backup_dir))
+        
+        manifestDB = os.path.join(dir, "Manifest.db")
+
+        print(manifestDB)
+
+        if os.path.isfile(manifestDB):
+
+            try:
+                db = sqlite3.connect(manifestDB)
+                db.row_factory = sqlite3.Row
+
+                files = db.cursor().execute(f"SELECT * FROM Files ORDER BY domain, relativePath").fetchall()
+                
+            except:
+                raise FileError("Encrypted Manifest.db")
+
+        progress_total = len(files)
+
+        progress_bar = LiveProgress(live_progress_type = "bar", text_progress_bar = "Extracting backup files... ", progress_total = progress_total)
+        progress_bar.start()
+
+        list = []
+
+        for f in files:
+
+            splitted = f['relativePath'].split('/')
+            name = splitted[len(splitted)-1]
+
+            fileData = {
+
+                "Name" : name,
+                "RelativePath" : f['relativePath'],
+                "ID" : f['fileID'],
+                "Domain" : f['domain'],
+                **f
+            }
+
+            f = dict(f)
+
+            file = NSKeyedUnArchiver.unserializeNSKeyedArchiver( f['file'] )
+
+            fileData['file'] = file
+
+            name = fileData['file']['RelativePath'].split('/')[-1]
+
+            data = {
+                "Name" : name,
+                "Size" : fileData['file']['Size'],
+                "Created" : fileData['file']['Birth'],
+                "LastModified" : fileData['file']['LastModified'],
+                "LastStatusChange" : fileData['file']['LastStatusChange'],
+                "Mode" : fileData['file']['Mode'],
+                "IsFolder" : True if fileData['file']['Size'] == 0 and 'EncryptionKey' not in fileData else False,
+                "UserID" : fileData['file']['UserID'],
+                "Inode" : fileData['file']['InodeNumber'],
+                "File" : fileData['file']
+            }
+
+            list.append(data)
+
+            progress_bar.current_progress += 1
+        
+        progress_bar.join()
+
+        return list
 
 
