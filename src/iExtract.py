@@ -211,7 +211,7 @@ class iExtract(object):
 
 
     @classmethod
-    def load_files(cls, backup_dir: str = None):
+    def get_files(cls, backup_dir: str = None):
 
         if backup_dir is None:
             
@@ -234,13 +234,13 @@ class iExtract(object):
                 db.row_factory = sqlite3.Row
 
                 files = db.cursor().execute(f"SELECT * FROM Files ORDER BY domain, relativePath").fetchall()
-                
+
             except:
                 raise FileError("Encrypted Manifest.db")
 
         progress_total = len(files)
 
-        progress_bar = LiveProgress(live_progress_type = "bar", text_progress_bar = "Extracting backup files... ", progress_total = progress_total)
+        progress_bar = LiveProgress(live_progress_type = "bar", text = "Extracting backup files... ", progress_total = progress_total)
         progress_bar.start()
 
         list = []
