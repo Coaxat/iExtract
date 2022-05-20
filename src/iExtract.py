@@ -1,6 +1,7 @@
-import os
+import os, time
 import platform
 import NSKeyedUnArchiver
+import inspect
 from liveProgress import LiveProgress
 from utils import Utils
 
@@ -38,6 +39,8 @@ class iExtract(object):
 
         self.is_encrypted = self.manifest_plist["IsEncrypted"]
 
+        self._backup_files = []
+
 
 
     @property
@@ -61,6 +64,7 @@ class iExtract(object):
                 return
             
             raise AttributeError("Provided backup rootdir does not exist.")
+       
 
 
 
@@ -222,6 +226,10 @@ class iExtract(object):
         if files is None:
             return
 
+        if self._backup_files:
+
+            return self._backup_files
+
         progress_total = len(files)
 
         progress_bar = LiveProgress(live_progress_type = "bar", text = "Extracting backup files... ", progress_total = progress_total)
@@ -231,44 +239,35 @@ class iExtract(object):
 
         for f in files:
 
-            splitted = f['relativePath'].split('/')
-            name = splitted[len(splitted)-1]
-
-            fileData = {
-
-                "Name" : name,
-                "RelativePath" : f['relativePath'],
-                "ID" : f['fileID'],
-                "Domain" : f['domain'],
-                **f
-            }
+            name = f['relativePath'].split('/')[-1]
 
             f = dict(f)
 
             file = NSKeyedUnArchiver.unserializeNSKeyedArchiver( f['file'] )
 
-            fileData['file'] = file
-
-            name = fileData['file']['RelativePath'].split('/')[-1]
-
             data = {
                 "Name" : name,
-                "Size" : fileData['file']['Size'],
-                "Created" : fileData['file']['Birth'],
-                "LastModified" : fileData['file']['LastModified'],
-                "LastStatusChange" : fileData['file']['LastStatusChange'],
-                "Mode" : fileData['file']['Mode'],
-                "IsFolder" : True if fileData['file']['Size'] == 0 and 'EncryptionKey' not in fileData else False,
-                "UserID" : fileData['file']['UserID'],
-                "Inode" : fileData['file']['InodeNumber'],
-                "File" : fileData['file']
+                "RelativePath" : f['relativePath'],
+                "ID" : f['fileID'],
+                "Domain" : f['domain'],
+                "Size" : file['Size'],
+                "Created" : file['Birth'],
+                "LastModified" : file['LastModified'],
+                "LastStatusChange" : file['LastStatusChange'],
+                "Mode" : file['Mode'],
+                "UserID" : file['UserID'],
+                "Inode" : file['InodeNumber']
             }
 
-            list.append(data)
+            if file['Size'] > 0:
+                list.append(data)
 
             progress_bar.current_progress += 1
         
         progress_bar.join()
+
+        if not self._backup_files:
+            self._backup_files = list
 
         return list
 
@@ -289,6 +288,7 @@ class iExtract(object):
             domains.append(domain['domain'])
 
         return domains
+
 
 
 
