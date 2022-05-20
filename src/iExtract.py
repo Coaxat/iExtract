@@ -139,9 +139,12 @@ class iExtract(object):
             
             manifest = cls.get_plist("manifest", backup_dir)
 
+            date = manifest["Date"].strftime("%m/%d/%Y, %H:%M:%S")
+
             basic_infos = {
 
                 "UDID" : manifest["Lockdown"]["UniqueDeviceID"],
+                "Date" : date,
                 "Device name" :  manifest["Lockdown"]["DeviceName"],
                 "Encrypted" : manifest["IsEncrypted"],
                 "Path" : backup_dir
@@ -158,7 +161,7 @@ class iExtract(object):
         manifest = self.manifest_plist
         status = self.status_plist
 
-        date = status["Date"].strftime("%m/%d/%Y, %H:%M:%S")
+        date = manifest["Date"].strftime("%m/%d/%Y, %H:%M:%S")
 
         backup_infos = {
                 "Backup" : {
@@ -191,7 +194,7 @@ class iExtract(object):
 
         elif infos_type == "device":
             return list[1]
-            
+
         else:
             return list
 
