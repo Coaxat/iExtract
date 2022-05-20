@@ -1,5 +1,6 @@
 import os
 import plistlib
+import sqlite3
 from liveProgress import LiveProgress
 
 class Utils():
@@ -90,3 +91,22 @@ class Utils():
 
         except OSError as e:
             print(e)
+
+
+
+    @classmethod
+    def db_execute(self, db_file: str, query: str):
+        
+        try:
+            db = sqlite3.connect(db_file)
+            db.row_factory = sqlite3.Row
+
+            result = db.cursor().execute(query).fetchall()
+            
+            return result
+
+        except Exception as e:
+            print(e)
+        
+        finally:
+            db.close()

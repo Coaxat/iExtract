@@ -1,6 +1,5 @@
 import os
 import platform
-import sqlite3
 import NSKeyedUnArchiver
 from liveProgress import LiveProgress
 from utils import Utils
@@ -214,28 +213,11 @@ class iExtract(object):
 
 
 
-    def db_execute(self, db_file: str, query: str):
-        
-        try:
-            db = sqlite3.connect(db_file)
-            db.row_factory = sqlite3.Row
-
-            result = db.cursor().execute(query).fetchall()
-            
-            return result
-
-        except Exception as e:
-            print(e)
-        
-        finally:
-            db.close()
-
-
     def get_files(self):
 
         query = "SELECT * FROM Files ORDER BY domain, relativePath"
 
-        files = self.db_execute(self.manifestDB, query)
+        files = Utils.db_execute(self.manifestDB, query)
 
         if files is None:
             return
@@ -296,7 +278,7 @@ class iExtract(object):
     
         query = "SELECT DISTINCT domain FROM Files"
 
-        result = self.db_execute(self.manifestDB, query)
+        result = Utils.db_execute(self.manifestDB, query)
 
         if result is None:
             return
