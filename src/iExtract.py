@@ -1,12 +1,13 @@
 import os
 import platform
 import sqlite3
+from turtle import back
 import NSKeyedUnArchiver
 from click import FileError
 from liveProgress import LiveProgress
 from utils import Utils
 
-_os_based_backups_rootdir =  { 
+os_based_backups_rootdir =  { 
         "Darwin" : "~/Library/Application Support/MobileSync/Backup", 
         "Windows" : "%HOME%\Apple Computer\MobileSync\Backup"
 }
@@ -19,7 +20,7 @@ _plists_dict = {
 
 class iExtract(object):
 
-    _backups_rootdir = None
+    _search_from_dir = None
     _backup_dir = None
 
     def __init__(self, udid: str, backups_rootdir: str = None):    
@@ -29,15 +30,15 @@ class iExtract(object):
 
         self.backup_dir = os.path.join(self._backups_rootdir, self.udid)
 
-        iExtract._backups_rootdir = self.backups_rootdir
+        iExtract._search_from_dir = self.backups_rootdir
         iExtract._backup_dir = self.backup_dir
 
         # Load all backup files plist
-        self.manifest = self.get_plist("manifest", self.backup_dir)
-        self.status = self.get_plist("status", self.backup_dir)
-        self.info = self.get_plist("info", self.backup_dir)
+        self.manifest_plist = self.get_plist("manifest", self.backup_dir)
+        self.status_plist = self.get_plist("status", self.backup_dir)
+        self.info_plist = self.get_plist("info", self.backup_dir)
 
-        self.manifestDB = {}
+        self.is_encrypted = self.manifest_plist["IsEncrypted"]
 
 
 
@@ -64,9 +65,8 @@ class iExtract(object):
             raise AttributeError("Provided backup rootdir does not exist.")
 
 
-
-    @classmethod
-    def get_os_based_backups_rootdir(cls):
+    @staticmethod
+    def get_os_based_backups_rootdir():
 
         o_s = platform.system()
 
@@ -76,7 +76,7 @@ class iExtract(object):
 
         # Try to get the OS default rootdir
         try: 
-            return os.path.expanduser(os.path.expandvars(_os_based_backups_rootdir[o_s]))
+            return os.path.expanduser(os.path.expandvars(os_based_backups_rootdir[o_s]))
 
         except:
             raise FileNotFoundError("Backups rootdir OS based NOT FOUND")
@@ -115,18 +115,18 @@ class iExtract(object):
 
 
     @classmethod
-    def search_available_backups(cls, backup_rootdir: str = None):
+    def search_available_backups(cls, search_from_dir: str = None):
 
-        if backup_rootdir is None: 
+        if search_from_dir is None: 
 
-            if cls._backups_rootdir is None: 
+            if cls._search_from_dir is None:
 
                 rootdir = cls.get_os_based_backups_rootdir()
             
             else:
-                rootdir = cls._backups_rootdir
+                rootdir = cls._search_from_dir
         else:
-            rootdir = os.path.expanduser(os.path.expandvars(backup_rootdir))
+            rootdir = os.path.expanduser(os.path.expandvars(search_from_dir))
 
         bkp = Utils.find_backups(rootdir)
 
@@ -137,96 +137,83 @@ class iExtract(object):
             rootdir = bkp[udid]
             backup_dir = os.path.join(rootdir, udid)
             
-            infos = cls.get_infos(backup_dir)
+            manifest = cls.get_plist("manifest", backup_dir)
 
-            backups.append(infos[0])
+            basic_infos = {
+
+                "UDID" : manifest["Lockdown"]["UniqueDeviceID"],
+                "Device name" :  manifest["Lockdown"]["DeviceName"],
+                "Encrypted" : manifest["IsEncrypted"],
+                "Path" : backup_dir
+            }
+
+            backups.append(basic_infos)
 
         return backups
 
 
 
-    @classmethod
-    def get_infos(cls, backup_dir: str = None):
-
-        if backup_dir is None:
-            
-            dir = cls._backup_dir
-
-            if dir is None:
-                raise AttributeError("Backup dir required")
-
-        else:
-            dir = os.path.expanduser(os.path.expandvars(backup_dir))
-
-        manifest = cls.get_plist("manifest", dir)
-        status = cls.get_plist("status", dir)
+    def get_infos(self, infos_type: str = "all"):
+        
+        manifest = self.manifest_plist
+        status = self.status_plist
 
         date = status["Date"].strftime("%m/%d/%Y, %H:%M:%S")
-    
-        backup_infos = {
 
-            "UUID" : status["UUID"],
-            "Date" : date,
-            "Full" : status["IsFullBackup"],
-            "Encrypted" : manifest["IsEncrypted"],
-            "RootDir" : os.path.dirname(dir),
-            "FullPath" : dir
+        backup_infos = {
+                "Backup" : {
+
+                    "UUID" : status["UUID"],
+                    "Date" : date,
+                    "Full" : status["IsFullBackup"],
+                    "Encrypted" : manifest["IsEncrypted"],
+                    "Rootdir" : os.path.dirname(self.backup_dir),
+                    "FullPath" : self.backup_dir
+            }
         }
 
         device_infos = {
+                "Device" : {
 
-            "UDID" : manifest["Lockdown"]["UniqueDeviceID"],
-            "Device name" :  manifest["Lockdown"]["DeviceName"],
-            "IOS version" : manifest["Lockdown"]["ProductVersion"],
-            "Passcode set" : manifest["WasPasscodeSet"],  
-            "Domain version" : manifest["SystemDomainsVersion"],
-            "Serial number" : manifest["Lockdown"]["SerialNumber"]
+                    "UDID" : manifest["Lockdown"]["UniqueDeviceID"],
+                    "Device name" :  manifest["Lockdown"]["DeviceName"],
+                    "IOS version" : manifest["Lockdown"]["ProductVersion"],
+                    "Passcode set" : manifest["WasPasscodeSet"],  
+                    "Domain version" : manifest["SystemDomainsVersion"],
+                    "Serial number" : manifest["Lockdown"]["SerialNumber"]
+            }
         } 
 
-        return [ backup_infos, device_infos ]
+        list = [backup_infos, device_infos]
 
+        if infos_type == "backup": 
+            return list[0]
 
-
-    @classmethod
-    def get_applications(cls, backup_dir: str = None, full_apps_list: bool = True):
-
-        if backup_dir is None:
+        elif infos_type == "device":
+            return list[1]
             
-            dir = cls._backup_dir
-
-            if dir is None:
-                raise AttributeError("Backup dir required")
-
         else:
-            dir = os.path.expanduser(os.path.expandvars(backup_dir))
+            return list
 
+
+
+    def get_applications(self, full_apps_list: bool = True):
 
         # Get the full apps list or user installed apps list
         if full_apps_list:
 
-            apps = list(cls.get_plist("manifest", dir)['Applications'].keys())
+            apps = list(self.get_plist("manifest", self.backup_dir)['Applications'].keys())
         
         else:
-            apps = cls.get_plist("info", dir)['Installed Applications']
+            apps = self.get_plist("info", self.backup_dir)['Installed Applications']
 
         return apps
 
 
 
-    @classmethod
-    def get_files(cls, backup_dir: str = None):
-
-        if backup_dir is None:
-            
-            dir = cls._backup_dir
-
-            if dir is None:
-                raise AttributeError("Backup dir required")
-
-        else:
-            dir = os.path.expanduser(os.path.expandvars(backup_dir))
+    def get_files(self):
         
-        manifestDB = os.path.join(dir, "Manifest.db")
+        manifestDB = os.path.join(self.backup_dir, "Manifest.db")
 
         if os.path.isfile(manifestDB):
 
