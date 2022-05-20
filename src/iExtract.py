@@ -296,5 +296,23 @@ class iExtract(object):
 
 
 
+    def get_domains(self):
+    
+        query = "SELECT DISTINCT domain FROM Files"
+
+        result = self.db_execute(self.manifestDB, query)
+
+        if result is None:
+            return
+
+        domains = []
+
+        for domain in result:
+            domains.append(domain['domain'])
+
+        return domains
+
+
+
 
 
