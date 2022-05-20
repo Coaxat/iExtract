@@ -1,7 +1,9 @@
+from asyncore import read
 import os
 import platform
 import sqlite3
 from turtle import back
+from unittest import result
 import NSKeyedUnArchiver
 from click import FileError
 from liveProgress import LiveProgress
@@ -30,10 +32,11 @@ class iExtract(object):
 
         self.backup_dir = os.path.join(self._backups_rootdir, self.udid)
 
+        self.manifestDB = os.path.join(self.backup_dir, "Manifest.db")
+
         iExtract._search_from_dir = self.backups_rootdir
         iExtract._backup_dir = self.backup_dir
 
-        # Load all backup files plist
         self.manifest_plist = self.get_plist("manifest", self.backup_dir)
         self.status_plist = self.get_plist("status", self.backup_dir)
         self.info_plist = self.get_plist("info", self.backup_dir)
@@ -63,6 +66,7 @@ class iExtract(object):
                 return
             
             raise AttributeError("Provided backup rootdir does not exist.")
+
 
 
     @staticmethod
@@ -214,20 +218,31 @@ class iExtract(object):
 
 
 
-    def get_files(self):
+    def db_execute(self, db_file: str, query: str):
         
-        manifestDB = os.path.join(self.backup_dir, "Manifest.db")
+        try:
+            db = sqlite3.connect(db_file)
+            db.row_factory = sqlite3.Row
 
-        if os.path.isfile(manifestDB):
+            result = db.cursor().execute(query).fetchall()
+            
+            return result
 
-            try:
-                db = sqlite3.connect(manifestDB)
-                db.row_factory = sqlite3.Row
+        except Exception as e:
+            print(e)
+        
+        finally:
+            db.close()
 
-                files = db.cursor().execute(f"SELECT * FROM Files ORDER BY domain, relativePath").fetchall()
 
-            except:
-                raise FileError("Encrypted Manifest.db")
+    def get_files(self):
+
+        query = "SELECT * FROM Files ORDER BY domain, relativePath"
+
+        files = self.db_execute(self.manifestDB, query)
+
+        if files is None:
+            return
 
         progress_total = len(files)
 
@@ -278,5 +293,8 @@ class iExtract(object):
         progress_bar.join()
 
         return list
+
+
+
 
 
