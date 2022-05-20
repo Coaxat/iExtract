@@ -139,6 +139,37 @@ class iExtract(object):
 
 
     @classmethod
+    def search_available_backups(cls, backup_rootdir: str = None):
+
+        if backup_rootdir is None: 
+
+            if cls._backups_rootdir is None: 
+
+                rootdir = cls.get_os_based_backups_rootdir()
+            
+            else:
+                rootdir = cls._backups_rootdir
+        else:
+            rootdir = os.path.expanduser(os.path.expandvars(backup_rootdir))
+
+        bkp = Utils.find_backups(rootdir)
+
+        backups = []
+
+        for udid in bkp.keys():
+
+            rootdir = bkp[udid]
+            backup_dir = os.path.join(rootdir, udid)
+            
+            infos = cls.get_infos(backup_dir)
+
+            backups.append(infos[0])
+
+        return backups
+
+
+
+    @classmethod
     def get_infos(cls, backup_dir: str = None):
 
         if backup_dir is None:
@@ -181,33 +212,29 @@ class iExtract(object):
 
 
     @classmethod
-    def search_available_backups(cls, backup_rootdir: str = None):
+    def get_applications(cls, backup_dir: str = None, full_apps_list: bool = True):
 
-        if backup_rootdir is None: 
-
-            if cls._backups_rootdir is None: 
-
-                rootdir = cls.get_os_based_backups_rootdir()
+        if backup_dir is None:
             
-            else:
-                rootdir = cls._backups_rootdir
+            dir = cls._backup_dir
+
+            if dir is None:
+                raise AttributeError("Backup dir required")
+
         else:
-            rootdir = os.path.expanduser(os.path.expandvars(backup_rootdir))
+            dir = os.path.expanduser(os.path.expandvars(backup_dir))
 
-        bkp = Utils.find_backups(rootdir)
 
-        backups = []
+        # Get the full apps list or user installed apps list
+        if full_apps_list:
 
-        for udid in bkp.keys():
+            apps = list(cls.get_manifest_plist(dir)['Applications'].keys())
+        
+        else:
+            apps = cls.get_info_plist(dir)['Installed Applications']
 
-            rootdir = bkp[udid]
-            backup_dir = os.path.join(rootdir, udid)
-            
-            infos = cls.get_infos(backup_dir)
+        return apps
 
-            backups.append(infos[0])
-
-        return backups
 
 
     @classmethod
@@ -224,8 +251,6 @@ class iExtract(object):
             dir = os.path.expanduser(os.path.expandvars(backup_dir))
         
         manifestDB = os.path.join(dir, "Manifest.db")
-
-        print(manifestDB)
 
         if os.path.isfile(manifestDB):
 
