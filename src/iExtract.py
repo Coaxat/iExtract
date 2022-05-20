@@ -11,7 +11,7 @@ _os_based_backups_rootdir =  {
         "Windows" : "%HOME%\Apple Computer\MobileSync\Backup"
 }
 
-_plists_list = { 
+_plists_dict = { 
     'manifest' : 'Manifest.plist',
     'status' : 'Status.plist',
     'info' : 'Info.plist'
@@ -32,10 +32,10 @@ class iExtract(object):
         iExtract._backups_rootdir = self.backups_rootdir
         iExtract._backup_dir = self.backup_dir
 
-        # Plist files
-        self.manifest = self.get_manifest_plist(self.backup_dir)
-        self.status = self.get_status_plist(self.backup_dir)
-        self.info = self.get_info_plist(self.backup_dir)
+        # Load all backup files plist
+        self.manifest = self.get_plist("manifest", self.backup_dir)
+        self.status = self.get_plist("status", self.backup_dir)
+        self.info = self.get_plist("info", self.backup_dir)
 
         self.manifestDB = {}
 
@@ -84,56 +84,32 @@ class iExtract(object):
 
 
     @classmethod
-    def get_manifest_plist(cls, backup_dir: str = None):
+    def get_plist(cls, plist_name: str, backup_dir: str = None):
 
         if backup_dir is None:
                 
             dir = cls._backup_dir
 
             if dir is None:
-                raise AttributeError("Backup dir required")
 
+                raise AttributeError("Backup dir required")
         else:
             dir = os.path.expanduser(os.path.expandvars(backup_dir))
 
-        file  = os.path.join(dir, _plists_list['manifest'])
-            
-        return Utils.load_plist(file)
+        # Allow to provide real plist name or his shortcut (eg: manifest == Manifest.plist)
+        if plist_name in _plists_dict.keys():
 
-
-    @classmethod
-    def get_status_plist(cls, backup_dir: str = None):
-
-        if backup_dir is None:
-            
-            dir = cls._backup_dir
-
-            if dir is None:
-                raise AttributeError("Backup dir required")
-
-        else:
-            dir = os.path.expanduser(os.path.expandvars(backup_dir))
+            file  = os.path.join(dir, _plists_dict[plist_name])
         
-        file = os.path.join(dir, _plists_list['status'])
-            
-        return Utils.load_plist(file)
+        elif plist_name in _plists_dict.values():
 
-
-    @classmethod
-    def get_info_plist(cls, backup_dir: str = None):
-
-        if backup_dir is None:
-                
-            dir = cls._backup_dir
-
-            if dir is None:
-                raise AttributeError("Backup dir required")
-
-        else:
-            dir = os.path.expanduser(os.path.expandvars(backup_dir))
-
-        file = os.path.join(dir, _plists_list['info'])
+            file  = os.path.join(dir, plist_name)
         
+        else:
+            available_plists = list(_plists_dict.values())
+
+            raise FileNotFoundError("Provided plist does not exist.\nAvailable backup plists are: " + ', '.join(available_plists))
+
         return Utils.load_plist(file)
 
 
@@ -182,8 +158,8 @@ class iExtract(object):
         else:
             dir = os.path.expanduser(os.path.expandvars(backup_dir))
 
-        manifest = cls.get_manifest_plist(dir)
-        status = cls.get_status_plist(dir)
+        manifest = cls.get_plist("manifest", dir)
+        status = cls.get_plist("status", dir)
 
         date = status["Date"].strftime("%m/%d/%Y, %H:%M:%S")
     
@@ -228,10 +204,10 @@ class iExtract(object):
         # Get the full apps list or user installed apps list
         if full_apps_list:
 
-            apps = list(cls.get_manifest_plist(dir)['Applications'].keys())
+            apps = list(cls.get_plist("manifest", dir)['Applications'].keys())
         
         else:
-            apps = cls.get_info_plist(dir)['Installed Applications']
+            apps = cls.get_plist("info", dir)['Installed Applications']
 
         return apps
 
