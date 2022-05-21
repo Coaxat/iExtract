@@ -131,14 +131,18 @@ class iExtract(object):
         else:
             rootdir = os.path.expanduser(os.path.expandvars(search_from_dir))
 
-        bkp = Utils.find_backups(rootdir)
+        backup_required_files = [ "Manifest.plist", "Info.plist", "Status.plist", "Manifest.db" ]
+
+        bkp = Utils.find(rootdir, backup_required_files)
 
         backups = []
 
-        for udid in bkp.keys():
+        for path in bkp:
 
-            rootdir = bkp[udid]
-            backup_dir = os.path.join(rootdir, udid)
+            dirname = path.split('/')[-1]
+            rootdir = path.replace('/' + dirname, '')
+
+            backup_dir = path
             
             manifest = cls.get_plist("manifest", backup_dir)
 
@@ -227,12 +231,11 @@ class iExtract(object):
             return
 
         if self._backup_files:
-
             return self._backup_files
 
         progress_total = len(files)
 
-        progress_bar = LiveProgress(live_progress_type = "bar", text = "Extracting backup files... ", progress_total = progress_total)
+        progress_bar = LiveProgress(live_progress_type = "bar", text = "Loading backup files... ", progress_total = progress_total)
         progress_bar.start()
 
         list = []
@@ -243,7 +246,7 @@ class iExtract(object):
 
             f = dict(f)
 
-            file = NSKeyedUnArchiver.unserializeNSKeyedArchiver( f['file'] )
+            file = NSKeyedUnArchiver.unserializeNSKeyedArchiver(f['file'])
 
             data = {
                 "Name" : name,
@@ -259,6 +262,7 @@ class iExtract(object):
                 "Inode" : file['InodeNumber']
             }
 
+            # Not a directory
             if file['Size'] > 0:
                 list.append(data)
 
@@ -288,6 +292,7 @@ class iExtract(object):
             domains.append(domain['domain'])
 
         return domains
+
 
 
 
